@@ -312,11 +312,21 @@
                     const endTime = steps.get('finished');
                     const duration = endTime - startTime;
 
+                    // Tentukan label berdasarkan step
+                    let label = 'sms';
+                    if (steps.has('dsp_data_received')) {
+                        label = 'locimei';
+                    } else if (steps.has('crm_data_received')) {
+                        label = 'info';
+                    }
+
                     results.push({
                         trx_id: trxId,
                         start_time: startTime,
                         end_time: endTime,
-                        duration: duration
+                        duration: duration,
+                        label: label,
+                        steps: steps
                     });
                 }
             }
@@ -328,11 +338,11 @@
             const seconds = ms / 1000;
 
             if (seconds < 1) {
-                return `±${Math.round(ms)} ms`;
+                return `${Math.round(ms)} ms`;
             } else if (seconds < 60) {
-                return `±${seconds.toFixed(1)} detik`;
+                return `${seconds.toFixed(1)} detik`;
             } else {
-                return `±${(seconds / 60).toFixed(1)} menit`;
+                return `${(seconds / 60).toFixed(1)} menit`;
             }
         }
 
@@ -347,6 +357,72 @@
             return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         }
 
+        function findSlowestStep(steps) {
+            const importantSteps = [
+                'job_started', 'producing_job', 'validate_finished',
+                'request_received', 'user_validated', 'validating_user',
+                'permission_validated', 'validating_permission',
+                'request_dsp_data', 'dsp_data_received', 'start_sending_sms',
+                'request_crm_data', 'crm_data_received', 'sms_sent', 'finished'
+            ];
+
+            const stepTimes = [];
+            for (const stepName of importantSteps) {
+                if (steps.has(stepName)) {
+                    stepTimes.push([stepName, steps.get(stepName)]);
+                }
+            }
+
+            stepTimes.sort((a, b) => a[1] - b[1]);
+
+            let slowestFrom = null;
+            let slowestTo = null;
+            let slowestDuration = 0;
+
+            for (let i = 0; i < stepTimes.length - 1; i++) {
+                const [fromStep, fromTime] = stepTimes[i];
+                const [toStep, toTime] = stepTimes[i + 1];
+                const duration = (toTime - fromTime) / 1000;
+
+                if (duration > slowestDuration) {
+                    slowestDuration = duration;
+                    slowestFrom = fromStep;
+                    slowestTo = toStep;
+                }
+            }
+
+            return [slowestFrom, slowestTo, slowestDuration * 1000];
+        }
+
+        function getAllStepTransitions(steps) {
+            const importantSteps = [
+                'job_started', 'producing_job', 'validate_finished',
+                'request_received', 'user_validated', 'validating_user',
+                'permission_validated', 'validating_permission',
+                'request_dsp_data', 'dsp_data_received', 'start_sending_sms',
+                'request_crm_data', 'crm_data_received', 'sms_sent', 'finished'
+            ];
+
+            const stepTimes = [];
+            for (const stepName of importantSteps) {
+                if (steps.has(stepName)) {
+                    stepTimes.push([stepName, steps.get(stepName)]);
+                }
+            }
+
+            stepTimes.sort((a, b) => a[1] - b[1]);
+
+            const transitions = [];
+            for (let i = 0; i < stepTimes.length - 1; i++) {
+                const [fromStep, fromTime] = stepTimes[i];
+                const [toStep, toTime] = stepTimes[i + 1];
+                const duration = toTime - fromTime;
+                transitions.push([fromStep, toStep, duration]);
+            }
+
+            return transitions;
+        }
+
         function generateReport(results) {
             if (results.length === 0) {
                 return '⚠️ Tidak ditemukan pasangan job_started dan finished';
@@ -355,12 +431,12 @@
             const firstStart = results[0].start_time;
             const lastEnd = results[results.length - 1].end_time;
 
-            // Hitung total latensi dari semua transaksi (bukan waktu awal-akhir)
+            // Hitung total waktu dari semua transaksi (bukan waktu awal-akhir)
             const totalDurationMs = results.reduce((sum, r) => sum + r.duration, 0);
 
             let report = '📌 SMS Timing Report\n';
             report += `Durasi proses log (${formatDateTime(firstStart)} - ${formatDateTime(lastEnd)}) : ${formatDuration(totalDurationMs)}\n`;
-            report += `Total latensi transaksi : ${formatDuration(totalDurationMs)}\n\n`;
+            report += `Total waktu transaksi : ${formatDuration(totalDurationMs)}\n\n`;
 
             report += 'Detail per Transaksi:\n';
             report += '-'.repeat(80) + '\n';
@@ -368,10 +444,11 @@
                 const startStr = formatDateTime(r.start_time);
                 const endStr = formatDateTime(r.end_time);
                 const durationStr = formatDuration(r.duration);
+                const label = r.label || 'sms';
 
-                report += `${i + 1}. ${r.trx_id}\n`;
+                report += `${i + 1}. Step SMS (${label})\n`;
                 report += `   Start: ${startStr} → End: ${endStr}\n`;
-                report += `   Latensi: ${durationStr}\n\n`;
+                report += `   Total waktu: ${durationStr}\n\n`;
             });
 
             // Ringkasan statistik
@@ -379,13 +456,39 @@
             const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
             const minDuration = Math.min(...durations);
             const maxDuration = Math.max(...durations);
+            const maxIndex = durations.indexOf(maxDuration);
+            const slowestResult = results[maxIndex];
+            const slowestStep = slowestResult.label || 'sms';
+            const slowestStepNum = maxIndex + 1;
+
+            // Cari transition step yang paling lama
+            const [slowestFrom, slowestTo, slowestTransitionDuration] = findSlowestStep(slowestResult.steps);
 
             report += 'Ringkasan Statistik:\n';
             report += '-'.repeat(40) + '\n';
             report += `Total transaksi : ${results.length}\n`;
             report += `Rata-rata       : ${formatDuration(avgDuration)}\n`;
             report += `Tercepat        : ${formatDuration(minDuration)}\n`;
-            report += `Terlama         : ${formatDuration(maxDuration)}`;
+            report += `Terlama         : ${formatDuration(maxDuration)}\n`;
+            report += `Step Terlama    : Step SMS #${slowestStepNum} (${slowestStep})\n`;
+            if (slowestFrom && slowestTo) {
+                report += `   Transition terlama: STEP=${slowestFrom} → STEP=${slowestTo} (${formatDuration(slowestTransitionDuration)})`;
+            }
+            report += '\n';
+
+            // Detail per Step - TOP 3 terlama
+            report += 'Detail Per-Step:\n';
+            report += '-'.repeat(80) + '\n';
+            results.forEach((r, idx) => {
+                report += `Step SMS #${idx + 1} (${r.label || 'sms'}):\n`;
+                const transitions = getAllStepTransitions(r.steps);
+                // Ambil top 3 terlama
+                const topTransitions = transitions.sort((a, b) => b[2] - a[2]).slice(0, 3);
+                for (const [fromStep, toStep, duration] of topTransitions) {
+                    report += `   STEP=${fromStep} → STEP=${toStep}: ${formatDuration(duration)}\n`;
+                }
+                report += '\n';
+            });
 
             return report;
         }
