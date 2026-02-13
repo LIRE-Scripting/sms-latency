@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS Latency Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000000;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        .input-section label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 250px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-copy {
+            background: #4caf50;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-copy:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.visible {
+            display: block;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .report-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .report-content {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .summary-card {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .summary-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .summary-item label {
+            display: block;
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .summary-item value {
+            display: block;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error.visible {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .loading.visible {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .example-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .example-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SMS Latency </h1>
+
+        </div>
+
+        <div class="card">
+            <div class="input-section">
+                <label for="logInput">
+                    Paste Log SMS di sini
+                    <span style="font-weight: normal; font-size: 0.9rem; color: #666;">
+                        (<a href="#" class="example-link" onclick="loadExample(); return false;">Lihat contoh</a>)
+                    </span>
+                </label>
+                <textarea id="logInput" placeholder="[2026-02-13 07:44:32.394.528] trx_id=A001260213074416728936250 | STEP=finished&#10;[2026-02-13 07:44:32.368.783] trx_id=A001260213074416728936250 | STEP=sms_sent&#10;..."></textarea>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="analyzeLog()"> Generate Report</button>
+                <button class="btn-secondary" onclick="clearInput()"> Clear</button>
+            </div>
+
+            <div class="error" id="errorMsg"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Menganalisis log...</p>
+            </div>
+        </div>
+
+        <div class="card result-section" id="resultSection">
+            <div class="report-header">
+                <div class="report-title">Hasil Analisis</div>
+                <button class="btn-copy" onclick="copyReport()">
+                    📋 Copy Report
+                </button>
+            </div>
+            <div class="report-content" id="reportContent"></div>
+        </div>
+    </div>
+
+    <script>
+        function parseLogFile(content) {
+            const transactions = new Map();
+            const pattern = /\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.(\d+)\.(\d+)\]\s+trx_id=([^\s|]+)\s+\|\s+STEP=(\w+)/;
+
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const match = line.match(pattern);
+                if (match) {
+                    const [, dateStr, millis, micros, trxId, step] = match;
+                    const microseconds = parseInt(millis) * 1000 + parseInt(micros);
+                    const dt = new Date(`${dateStr}.${microseconds.toString().padStart(6, '0')}`);
+
+                    if (!transactions.has(trxId)) {
+                        transactions.set(trxId, new Map());
+                    }
+                    transactions.get(trxId).set(step, dt);
+                }
+            }
+
+            return transactions;
+        }
+
+        function calculateLatency(transactions) {
+            const results = [];
+
+            for (const [trxId, steps] of transactions.entries()) {
+                if (steps.has('job_started') && steps.has('finished')) {
+                    const startTime = steps.get('job_started');
+                    const endTime = steps.get('finished');
+                    const duration = endTime - startTime;
+
+                    results.push({
+                        trx_id: trxId,
+                        start_time: startTime,
+                        end_time: endTime,
+                        duration: duration
+                    });
+                }
+            }
+
+            return results.sort((a, b) => a.start_time - b.start_time);
+        }
+
+        function formatDuration(ms) {
+            const seconds = ms / 1000;
+
+            if (seconds < 1) {
+                return `±${Math.round(ms)} ms`;
+            } else if (seconds < 60) {
+                return `±${seconds.toFixed(1)} detik`;
+            } else {
+                return `±${(seconds / 60).toFixed(1)} menit`;
+            }
+        }
+
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        function generateReport(results) {
+            if (results.length === 0) {
+                return '⚠️ Tidak ditemukan pasangan job_started dan finished';
+            }
+
+            const firstStart = results[0].start_time;
+            const lastEnd = results[results.length - 1].end_time;
+
+            // Hitung total latensi dari semua transaksi (bukan waktu awal-akhir)
+            const totalDurationMs = results.reduce((sum, r) => sum + r.duration, 0);
+
+            let report = '📌 SMS Timing Report\n';
+            report += `Durasi proses log (${formatDateTime(firstStart)} - ${formatDateTime(lastEnd)}) : ${formatDuration(totalDurationMs)}\n`;
+            report += `Total latensi transaksi : ${formatDuration(totalDurationMs)}\n\n`;
+
+            report += 'Detail per Transaksi:\n';
+            report += '-'.repeat(80) + '\n';
+            results.forEach((r, i) => {
+                const startStr = formatDateTime(r.start_time);
+                const endStr = formatDateTime(r.end_time);
+                const durationStr = formatDuration(r.duration);
+
+                report += `${i + 1}. ${r.trx_id}\n`;
+                report += `   Start: ${startStr} → End: ${endStr}\n`;
+                report += `   Latensi: ${durationStr}\n\n`;
+            });
+
+            // Ringkasan statistik
+            const durations = results.map(r => r.duration);
+            const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+            const minDuration = Math.min(...durations);
+            const maxDuration = Math.max(...durations);
+
+            report += 'Ringkasan Statistik:\n';
+            report += '-'.repeat(40) + '\n';
+            report += `Total transaksi : ${results.length}\n`;
+            report += `Rata-rata       : ${formatDuration(avgDuration)}\n`;
+            report += `Tercepat        : ${formatDuration(minDuration)}\n`;
+            report += `Terlama         : ${formatDuration(maxDuration)}`;
+
+            return report;
+        }
+
+        function analyzeLog() {
+            const input = document.getElementById('logInput').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const resultSection = document.getElementById('resultSection');
+            const reportContent = document.getElementById('reportContent');
+            const loading = document.getElementById('loading');
+
+            // Reset
+            errorMsg.classList.remove('visible');
+            resultSection.classList.remove('visible');
+
+            if (!input) {
+                errorMsg.textContent = '❌ Silakan paste log SMS terlebih dahulu';
+                errorMsg.classList.add('visible');
+                return;
+            }
+
+            // Show loading
+            loading.classList.add('visible');
+
+            // Process with timeout to show loading
+            setTimeout(() => {
+                try {
+                    const transactions = parseLogFile(input);
+                    const results = calculateLatency(transactions);
+                    const report = generateReport(results);
+
+                    reportContent.textContent = report;
+                    resultSection.classList.add('visible');
+                } catch (error) {
+                    errorMsg.textContent = `❌ Error: ${error.message}`;
+                    errorMsg.classList.add('visible');
+                } finally {
+                    loading.classList.remove('visible');
+                }
+            }, 500);
+        }
+
+        function clearInput() {
+            document.getElementById('logInput').value = '';
+            document.getElementById('resultSection').classList.remove('visible');
+            document.getElementById('errorMsg').classList.remove('visible');
+        }
+
+        function copyReport() {
+            const reportContent = document.getElementById('reportContent').textContent;
+
+            navigator.clipboard.writeText(reportContent).then(() => {
+                // Show feedback
+                const btn = document.querySelector('.btn-copy');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert('Gagal copy: ' + err);
+            });
+        }
+
+        function loadExample() {
+            const exampleLog = `[2026-02-13 07:44:32.394.528] trx_id=A001260213074416728936250 | STEP=finished
+
+[2026-02-13 07:44:32.368.783] trx_id=A001260213074416728936250 | STEP=sms_sent
+
+[2026-02-13 07:44:16.981.679] trx_id=A001260213074416728936250 | STEP=producing_job
+
+[2026-02-13 07:44:16.981.657] trx_id=A001260213074416728936250 | STEP=validate_finished
+
+[2026-02-13 07:44:16.980.802] trx_id=A001260213074416728936250 | STEP=request_received
+
+[2026-02-13 07:44:17.54.197] trx_id=A001260213074416728936250 | STEP=start_sending_sms
+
+[2026-02-13 07:44:17.54.039] trx_id=A001260213074416728936250 | STEP=dsp_data_received
+
+[2026-02-13 07:44:17.16.752] trx_id=A001260213074416728936250 | STEP=request_dsp_data
+
+[2026-02-13 07:44:17.6.508] trx_id=A001260213074416728936250 | STEP=permission_validated
+
+[2026-02-13 07:44:17.4.857] trx_id=A001260213074416728936250 | STEP=validating_permission
+
+[2026-02-13 07:44:17.4.766] trx_id=A001260213074416728936250 | STEP=user_validated
+
+[2026-02-13 07:44:16.999.031] trx_id=A001260213074416728936250 | STEP=validating_user
+
+[2026-02-13 07:44:16.987.031] trx_id=A001260213074416728936250 | STEP=job_started
+
+[2026-02-13 07:43:49.129.812] trx_id=A001260213074333679936250 | STEP=finished
+
+[2026-02-13 07:43:49.114.866] trx_id=A001260213074333679936250 | STEP=sms_sent
+
+[2026-02-13 07:43:39.63.938] trx_id=A001260213074333679936250 | STEP=start_sending_sms
+
+[2026-02-13 07:43:39.63.794] trx_id=A001260213074333679936250 | STEP=crm_data_received
+
+[2026-02-13 07:43:33.999.764] trx_id=A001260213074333679936250 | STEP=request_crm_data
+
+[2026-02-13 07:43:33.944.607] trx_id=A001260213074333679936250 | STEP=producing_job
+
+[2026-02-13 07:43:33.944.575] trx_id=A001260213074333679936250 | STEP=validate_finished
+
+[2026-02-13 07:43:33.942.838] trx_id=A001260213074333679936250 | STEP=request_received
+
+[2026-02-13 07:43:33.979.414] trx_id=A001260213074333679936250 | STEP=user_validated
+
+[2026-02-13 07:43:33.970.174] trx_id=A001260213074333679936250 | STEP=validating_user
+
+[2026-02-13 07:43:33.954.874] trx_id=A001260213074333679936250 | STEP=job_started`;
+
+            document.getElementById('logInput').value = exampleLog;
+        }
+    </script>
+</body>
+</html>
