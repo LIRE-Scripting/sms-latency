@@ -436,9 +436,9 @@
 
             let report = '📌 SMS Timing Report\n';
             report += `Durasi proses log (${formatDateTime(firstStart)} - ${formatDateTime(lastEnd)}) : ${formatDuration(totalDurationMs)}\n`;
-            report += `Total waktu transaksi : ${formatDuration(totalDurationMs)}\n\n`;
+            report += `Total waktu : ${formatDuration(totalDurationMs)}\n\n`;
 
-            report += 'Detail per Transaksi:\n';
+            report += 'Detail :\n';
             report += '-'.repeat(80) + '\n';
             results.forEach((r, i) => {
                 const startStr = formatDateTime(r.start_time);
@@ -466,7 +466,7 @@
 
             report += 'Ringkasan Statistik:\n';
             report += '-'.repeat(40) + '\n';
-            report += `Total transaksi : ${results.length}\n`;
+            report += `Total : ${results.length}\n`;
             report += `Rata-rata       : ${formatDuration(avgDuration)}\n`;
             report += `Tercepat        : ${formatDuration(minDuration)}\n`;
             report += `Terlama         : ${formatDuration(maxDuration)}\n`;
